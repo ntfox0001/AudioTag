@@ -1,0 +1,13 @@
+# 大文件 / 可再生数据，不入库
+models/
+index/
+kenney/
+test_sounds/
+
+# 缓存与临时文件
+__pycache__/
+.numbacache/
+.screenshots/
+*.pyc
+server.log
+results.csv

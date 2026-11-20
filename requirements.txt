@@ -1,0 +1,8 @@
+# AudioTag dependencies (CPU-only)
+# torch: CPU 版即可；如需 GPU 版请按 pytorch.org 指引单独安装
+torch
+transformers
+librosa
+soundfile
+numpy
+requests

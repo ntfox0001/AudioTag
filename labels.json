@@ -1,0 +1,16 @@
+{
+  "positive": [
+    "shotgun blast, punchy, dry",
+    "gunshot, close, crisp, one-shot"
+  ],
+  "negative": [
+    "gunshot with long reverb tail, distant outdoor echo",
+    "door slam",
+    "camera shutter click",
+    "ambience, background noise, field recording"
+  ],
+  "extra": [
+    "grenade explosion",
+    "laser gun fire, sci-fi"
+  ]
+}

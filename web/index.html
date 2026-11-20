@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>音效检索</title>
+<style>
+:root{--bg:#1e1e28;--panel:#262633;--line:#3a3a4a;--fg:#ddd;--dim:#8a8a9a;--accent:#7ec8ff;--ok:#8bd450;--warn:#f0b429;--err:#f26d6d}
+*{box-sizing:border-box}
+body{font-family:Segoe UI,Microsoft YaHei,sans-serif;background:var(--bg);color:var(--fg);margin:0}
+header{display:flex;align-items:center;gap:16px;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:17px;margin:0;color:var(--accent);font-weight:600}
+nav{display:flex;gap:6px;margin-left:12px}
+nav button{background:none;border:1px solid var(--line);color:var(--dim);padding:6px 18px;border-radius:6px;cursor:pointer;font-size:14px}
+nav button.active{color:var(--accent);border-color:var(--accent);background:#7ec8ff14}
+main{max-width:1100px;margin:0 auto;padding:24px}
+.hidden{display:none}
+/* 搜索 */
+.searchbar{display:flex;gap:10px}
+.searchbar input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px 16px;color:var(--fg);font-size:15px;outline:none}
+.searchbar input:focus{border-color:var(--accent)}
+.searchbar button{background:var(--accent);border:none;color:#10202e;font-size:15px;font-weight:600;padding:0 28px;border-radius:8px;cursor:pointer}
+.searchbar button:disabled{opacity:.5;cursor:default}
+.meta{color:var(--dim);font-size:13px;margin:12px 2px}
+table{border-collapse:collapse;width:100%}
+th,td{padding:7px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;font-size:14px}
+th{color:var(--dim);font-weight:500}
+tr:hover{background:#ffffff08}
+audio{width:300px;height:32px}
+.score{color:var(--ok);font-weight:600}
+.err{color:var(--err)}
+/* 索引 */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px}
+.card h2{font-size:15px;margin:0 0 14px;color:var(--accent)}
+.row{display:flex;gap:10px;align-items:center}
+.row input[type=text]{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 14px;color:var(--fg);font-size:14px;outline:none}
+.row button{border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer}
+.btn-main{background:var(--accent);color:#10202e}
+.btn-warn{background:var(--warn);color:#2e2200}
+.btn-ok{background:var(--ok);color:#1b2e0a}
+.btn-stop{background:var(--err);color:#fff}
+button:disabled{opacity:.4;cursor:default}
+.progress{height:10px;background:var(--bg);border-radius:5px;overflow:hidden;margin:14px 0 6px}
+.progress>div{height:100%;background:var(--accent);width:0;transition:width .4s}
+.stat{display:flex;gap:26px;color:var(--dim);font-size:13px;margin-top:8px;flex-wrap:wrap}
+.stat b{color:var(--fg);font-weight:600}
+#cur{color:var(--dim);font-size:13px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg{font-size:14px;margin-top:10px}
+.msg.done{color:var(--ok)}.msg.error{color:var(--err)}.msg.paused{color:var(--warn)}
+.tag{display:inline-block;font-size:12px;padding:2px 10px;border-radius:10px;border:1px solid var(--line);color:var(--dim)}
+.tag.running{color:var(--accent);border-color:var(--accent)}
+.tag.paused{color:var(--warn);border-color:var(--warn)}
+.tag.done{color:var(--ok);border-color:var(--ok)}
+.tag.error{color:var(--err);border-color:var(--err)}
+</style>
+</head>
+<body>
+<header>
+  <h1>音效检索</h1>
+  <nav>
+    <button id="tab-search" class="active" onclick="show('search')">搜索</button>
+    <button id="tab-build" onclick="show('build')">索引</button>
+  </nav>
+</header>
+
+<main>
+<section id="view-search">
+  <div class="searchbar">
+    <input id="q" placeholder="描述想要的音效，如：金属撞击 / laser shot" onkeydown="if(event.key==='Enter')doSearch()">
+    <button id="btn-search" onclick="doSearch()">搜索</button>
+  </div>
+  <div id="s-meta" class="meta"></div>
+  <div id="s-err" class="meta err"></div>
+  <table id="s-table" class="hidden">
+    <thead><tr><th>#</th><th>相似度</th><th>文件名</th><th>时长</th><th>播放</th></tr></thead>
+    <tbody id="s-body"></tbody>
+  </table>
+</section>
+
+<section id="view-build" class="hidden">
+  <div class="card">
+    <h2>构建索引</h2>
+    <div class="row">
+      <input type="text" id="dir" value="d:\audio_tag\kenney" placeholder="音频目录">
+      <button id="b-start" class="btn-main" onclick="startBuild()">开始构建</button>
+    </div>
+    <div class="progress"><div id="b-bar"></div></div>
+    <div id="cur"></div>
+    <div class="stat">
+      <span>状态 <b id="b-status" class="tag">未运行</b></span>
+      <span>阶段 <b id="b-phase">-</b></span>
+      <span>进度 <b id="b-count">0 / 0</b></span>
+      <span>跳过 <b id="b-skip">0</b></span>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button id="b-pause" class="btn-warn" onclick="ctrl('pause')" disabled>暂停</button>
+      <button id="b-resume" class="btn-ok" onclick="ctrl('resume')" disabled>继续</button>
+      <button id="b-stop" class="btn-stop" onclick="ctrl('stop')" disabled>停止</button>
+    </div>
+    <div id="b-msg" class="msg"></div>
+  </div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+function show(t){
+  $('view-search').classList.toggle('hidden',t!=='search');
+  $('view-build').classList.toggle('hidden',t!=='build');
+  $('tab-search').classList.toggle('active',t==='search');
+  $('tab-build').classList.toggle('active',t==='build');
+}
+async function doSearch(){
+  const q=$('q').value.trim();
+  if(!q)return;
+  $('btn-search').disabled=true;
+  $('s-err').textContent='';
+  try{
+    const r=await fetch('/api/search?q='+encodeURIComponent(q)+'&top=50');
+    const d=await r.json();
+    if(d.error){$('s-err').textContent=d.error;$('s-table').classList.add('hidden');return}
+    $('s-meta').textContent=`提示词: ${d.prompts.join(' | ')} ｜ 索引 ${d.total} 条，显示 Top ${d.results.length}`;
+    $('s-body').innerHTML=d.results.map(x=>`<tr>
+      <td>${x.rank}</td><td class="score">${x.score.toFixed(4)}</td>
+      <td>${esc(x.name)}</td><td>${x.duration}s</td>
+      <td><audio controls preload="none" src="/api/audio?p=${encodeURIComponent(x.path)}"></audio></td></tr>`).join('');
+    $('s-table').classList.remove('hidden');
+  }catch(e){$('s-err').textContent='请求失败: '+e}
+  $('btn-search').disabled=false;
+}
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+let timer=null;
+async function refresh(){
+  try{
+    const s=await (await fetch('/api/build/status')).json();
+    const running=s.status==='running',paused=s.status==='paused';
+    const pct=s.total?Math.round(s.processed/s.total*100):0;
+    $('b-bar').style.width=pct+'%';
+    $('b-status').textContent={idle:'未运行',running:'进行中',paused:'已暂停',stopped:'已停止',done:'已完成',error:'出错'}[s.status]||s.status;
+    $('b-status').className='tag '+s.status;
+    $('b-phase').textContent=s.phase||'-';
+    $('b-count').textContent=`${s.processed} / ${s.total}`;
+    $('b-skip').textContent=s.skipped;
+    $('cur').textContent=s.current?`当前: ${s.current}`:'';
+    $('b-msg').textContent=s.message||'';
+    $('b-msg').className='msg '+s.status;
+    $('b-start').disabled=running||paused;
+    $('b-pause').disabled=!running;
+    $('b-resume').disabled=!paused;
+    $('b-stop').disabled=!(running||paused);
+    if(timer&&(s.status==='done'||s.status==='stopped'||s.status==='error'||s.status==='idle')){clearInterval(timer);timer=null}
+  }catch(e){}
+}
+async function startBuild(){
+  const r=await fetch('/api/build/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:$('dir').value.trim()})});
+  const d=await r.json();
+  if(d.error){$('b-msg').textContent=d.error;$('b-msg').className='msg error';return}
+  if(!timer)timer=setInterval(refresh,1000);
+  refresh();
+}
+async function ctrl(act){await fetch('/api/build/'+act,{method:'POST'});refresh()}
+window.onload=()=>{refresh();if($('b-status').textContent==='进行中'||$('b-status').textContent==='已暂停')timer=setInterval(refresh,1000)};
+</script>
+</body>
+</html>
